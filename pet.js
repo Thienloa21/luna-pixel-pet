@@ -30,18 +30,23 @@
       [4, 0, 0, -.05, .68], [11], [8]
     ]},
     curtsy: {label: 'Реверанс', step: 145, poses: [
-      [8], [4, 6], [10, 9, 0, .04], [12, 9, 0, .08, 1, .94],
-      [12, 9, 0, .10, 1, .88], [12, 9, 0, .10, 1, .88],
-      [12, 5, 0, .06, 1, .95], [10, 3], [8]
+      [8], [8, 2, 0, .025], [8, 5, 0, .06, 1, .96],
+      [8, 7, 0, .12, 1, .88], [9, 7, 0, .16, 1, .82],
+      [9, 7, 0, .16, 1, .82], [8, 5, 0, .10, 1, .90],
+      [8, 2, 0, .03, 1, .97], [8]
     ]},
     levitate: {label: 'Левитируй', step: 140, effect: 'orbit', poses: [
-      [8], [12], [16, 0, -12], [17, 0, -20], [18, 0, -27],
-      [18, 0, -32], [19, 0, -30], [19, 0, -27], [18, 0, -30],
-      [17, 0, -28], [16, 0, -19], [16, 0, -10], [15], [8]
+      [8], [8, 0, 0, 0, 1.02, .97], [8, 0, -4, -.015, 1, .96],
+      [9, -1, -12, -.02, .99, .93], [9, -2, -20, -.025, .98, .90],
+      [9, -2, -25, -.015, .98, .88], [9, 0, -27, 0, .98, .88],
+      [9, 2, -26, .015, .98, .88], [9, 3, -24, .025, .98, .89],
+      [9, 2, -20, .02, .99, .91], [9, 1, -13, .01, 1, .94],
+      [8, 0, -5, 0, 1, .97], [8, 0, 0, 0, 1.02, .97], [8]
     ]},
     moonlight: {label: 'Лунная магия', step: 125, effect: 'burst', poses: [
-      [8], [9], [10], [10, -2, 0, -.04], [11], [11, -3, 0, -.04],
-      [11, -2], [11], [10], [10], [8]
+      [8], [8, -1, 0, -.015], [10, -2, 0, -.025], [10, -2, 0, -.025],
+      [11, 0, 0, .02], [11, 1, 0, .04], [11, 1, 0, .035],
+      [11, 0, 0, .02], [10, 0, 0, .01], [10], [8]
     ]}
   });
   for (const gesture of Object.values(gestures)) gesture.duration = gesture.step * gesture.poses.length;
@@ -85,7 +90,7 @@
 
   function frameAt(pose, elapsed) {
     const gesture = gestures[pose];
-    if (gesture) return Math.min(gesture.poses.length - 1, Math.floor(elapsed / gesture.step));
+    if (gesture) return Math.max(0, Math.min(gesture.poses.length - 1, elapsed / gesture.step));
     switch (pose) {
       case 'walk': return Math.floor(elapsed / 105) % 8;
       case 'wave': return [8, 10, 11, 10, 11, 10, 8][Math.min(6, Math.floor(elapsed / 135))];
@@ -114,18 +119,42 @@
     const phase = (step - 2) / (length - 3);
     ctx.save();
     ctx.scale(side / cell, side / cell);
-    ctx.globalAlpha = Math.min(1, phase * 5 + .4, (1 - phase) * 3);
+    ctx.globalAlpha = Math.min(1, phase * 6, (1 - phase) * 3);
     for (let i = 0; i < 6; i++) {
       const angle = i * Math.PI / 3 + step * (orbit ? .44 : .17);
       const radius = orbit ? 59 : 9 + phase * 27;
       const x = (orbit ? 99 : 149) + Math.cos(angle) * radius;
       const y = (orbit ? 112 - step : 95) + Math.sin(angle) * radius * (orbit ? .35 : 1);
-      const arm = (i + step) % 3 === 0 ? 5 : 3;
+      const arm = i % 3 === 0 ? 5 : 3;
       ctx.fillStyle = i % 2 ? '#fff1fc' : '#c2a7ff';
       ctx.fillRect(Math.round(x) - arm, Math.round(y), arm * 2 + 1, 1);
       ctx.fillRect(Math.round(x), Math.round(y) - arm, 1, arm * 2 + 1);
     }
     ctx.restore();
+  }
+
+  // Match speeds between adjacent keyframes and ease to a stop at reversals.
+  function tangent(before, after) {
+    return before * after > 0 ? 2 * before * after / (before + after) : 0;
+  }
+
+  function transformAt(poses, frame) {
+    const index = Math.floor(frame);
+    const t = frame - index;
+    const current = poses[index];
+    const next = poses[index + 1] ?? current;
+    const previous = poses[index - 1] ?? current;
+    const following = poses[index + 2] ?? next;
+    const blend = t * t * (3 - 2 * t);
+    return [0, 0, 0, 1, 1].map((fallback, i) => {
+      const column = i + 1;
+      const start = current[column] ?? fallback;
+      const end = next[column] ?? fallback;
+      const delta = end - start;
+      const startSpeed = tangent(start - (previous[column] ?? fallback), delta);
+      const endSpeed = tangent(delta, (following[column] ?? fallback) - end);
+      return start + delta * blend + t * (1 - t) * ((1 - t) * startSpeed - t * endSpeed);
+    });
   }
 
   function paint(ctx, pose, frame, facing = 1) {
@@ -142,13 +171,13 @@
     const step = frame;
     if (gesture) {
       ctx.save();
-      const [sprite, x = 0, y = 0, angle = 0, sx = 1, sy = 1] = gesture.poses[frame];
+      const [x, y, angle, sx, sy] = transformAt(gesture.poses, frame);
       const pivot = side * 184 / cell;
       ctx.translate(side / 2 + x * side / cell, pivot + y * side / cell);
       ctx.rotate(angle);
       ctx.scale(sx, sy);
       ctx.translate(-side / 2, -pivot);
-      frame = sprite;
+      frame = gesture.poses[Math.floor(frame)][0];
     }
     ctx.drawImage(atlas, frame % layout.columns * cell, Math.floor(frame / layout.columns) * cell, cell, cell, 0, 0, side, side);
     if (gesture) ctx.restore();
