@@ -38,6 +38,9 @@ header .switch { margin-bottom: 9px; }
 .pedestal { position: absolute; bottom: 9px; width: 100px; height: 13px; border-radius: 50%; background: #181225a8; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 5px; }
+.more-actions { padding: 6px 0; }
+.more-actions summary { cursor: pointer; }
+.more-actions .actions { grid-template-columns: repeat(2, 1fr); margin-top: 6px; }
 button, select {
   font: inherit; color: inherit; background: #2c223b;
   border: 1px solid #493859; border-radius: 7px; padding: 6px 9px;

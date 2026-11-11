@@ -1,5 +1,5 @@
 (() => {
-  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
+  const {size, defaults, reduced, gestures, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
   const {gravity, surface, visibleAt, trajectory, plan, crossing, firstCrossing} = LunaPlatforms;
   const host = document.createElement('luna-pet');
   for (const [property, value] of Object.entries({
@@ -239,7 +239,9 @@
     } else if (roll < 0.79) {
       jump();
     } else if (roll < 0.89) {
-      play('wave', 950);
+      const choices = Object.keys(gestures);
+      const gesture = choices[Math.floor(Math.random() * choices.length)];
+      play(gesture, gestures[gesture].duration);
     } else {
       play('sleep', sleepingTime());
     }
@@ -460,6 +462,7 @@
     if (message.action === 'jump') jump();
     else if (message.action === 'sit') rest('sit', 12000);
     else if (message.action === 'sleep') rest('sleep', 22000);
+    else if (gestures[message.action]) rest(message.action, gestures[message.action].duration);
     else return;
     respond(true);
   });
