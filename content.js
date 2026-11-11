@@ -1,5 +1,5 @@
 (() => {
-  const {size, defaults, reduced, gestures, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
+  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
   const {gravity, surface, visibleAt, trajectory, plan, crossing, firstCrossing} = LunaPlatforms;
   const host = document.createElement('luna-pet');
   for (const [property, value] of Object.entries({
@@ -27,12 +27,6 @@
     }
     .effect[data-sleep] { color: #ded0ff; font-size: 14px; }
     .effect[hidden] { display: none; }
-    .spell {
-      position: absolute; left: 0; top: 0; height: 8px; pointer-events: none;
-      border-radius: 999px; transform-origin: left center;
-      background: linear-gradient(90deg, #b89cff, #e4faff 75%, #fff);
-      box-shadow: 0 0 8px #cdf9ff, 0 0 20px 3px #8d6dff;
-    }
   `);
   root.adoptedStyleSheets = [sheet];
 
@@ -73,39 +67,6 @@
   let pointer;
   let paintedPose, paintedFrame, paintedFacing;
   let position;
-  const onAmo = /(?:^|\.)(?:amocrm\.(?:ru|com)|kommo\.com)$/i.test(globalThis.location?.hostname ?? '');
-  let nextSpellScan = 0;
-  let catAnimation;
-  let spellAnimation;
-
-  function trySpell(now) {
-    if (!onAmo || !settings.roam || !scale || pointer || now < nextSpellScan ||
-        !['idle', 'walk', 'sit'].includes(pose)) return;
-    nextSpellScan = now + 1500;
-    const target = LunaAmoPets.findCat(width, height);
-    if (!target) return;
-
-    facing = target.x >= x ? 1 : -1;
-    play('cast', 900);
-    const startX = x + facing * 12 * scale;
-    const startY = y - 25 * scale;
-    const dx = target.x - startX;
-    const dy = target.y - startY;
-    const beam = document.createElement('span');
-    beam.className = 'spell';
-    beam.setAttribute('aria-hidden', 'true');
-    beam.style.width = Math.max(12, Math.hypot(dx, dy)) + 'px';
-    beam.style.transform = `translate(${startX}px, ${startY - 4}px) rotate(${Math.atan2(dy, dx)}rad)`;
-    root.append(beam);
-    const delay = reduced.matches ? 0 : 180;
-    spellAnimation = beam.animate(reduced.matches
-      ? [{opacity: .45}, {opacity: .45}]
-      : [{opacity: 0, clipPath: 'inset(0 100% 0 0)'}, {opacity: 1, clipPath: 'inset(0)', offset: .32},
-         {opacity: 0, clipPath: 'inset(0)'}], {delay, duration: 420, fill: 'backwards'});
-    spellAnimation.onfinish = spellAnimation.oncancel = () => beam.remove();
-    catAnimation = LunaAmoPets.hide(target.pet, reduced.matches, delay + 100);
-    nextSpellScan = now + 12000;
-  }
 
   const floor = () => height - 9;
   const ceiling = () => 46 * scale;
@@ -239,9 +200,7 @@
     } else if (roll < 0.79) {
       jump();
     } else if (roll < 0.89) {
-      const choices = Object.keys(gestures);
-      const gesture = choices[Math.floor(Math.random() * choices.length)];
-      play(gesture, gestures[gesture].duration);
+      play('wave', 950);
     } else {
       play('sleep', sleepingTime());
     }
@@ -338,11 +297,9 @@
         const {next = 'sit', duration = sittingTime()} = afterLanding ?? {};
         afterLanding = undefined;
         play(next, duration);
-      } else if (pose === 'cast') play('sit', sittingTime());
-      else choose();
+      } else choose();
     }
 
-    trySpell(now);
     if (scale > 0) draw();
     raf = requestAnimationFrame(tick);
   }
@@ -436,8 +393,6 @@
       window.addEventListener('resize', resize);
       window.addEventListener('scroll', invalidateSupport, {capture: true, passive: true});
     } else if (!settings.enabled && host.isConnected) {
-      spellAnimation?.cancel();
-      catAnimation?.cancel();
       host.remove();
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
@@ -462,7 +417,6 @@
     if (message.action === 'jump') jump();
     else if (message.action === 'sit') rest('sit', 12000);
     else if (message.action === 'sleep') rest('sleep', 22000);
-    else if (gestures[message.action]) rest(message.action, gestures[message.action].duration);
     else return;
     respond(true);
   });

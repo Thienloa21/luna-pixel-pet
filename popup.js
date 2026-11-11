@@ -1,5 +1,5 @@
 (async () => {
-  const {defaults, reduced, gestures, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter} = Luna;
+  const {defaults, reduced, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter} = Luna;
   await ready;
   const enabled = document.getElementById('enabled');
   const roam = document.getElementById('roam');
@@ -98,14 +98,6 @@
   size.addEventListener('change', () => save({size: Number(size.value)}));
 
   const responses = {jump: 'Питомец прыгает!', sit: 'Питомец присел.', sleep: 'Питомец засыпает.'};
-  const gestureActions = document.getElementById('gesture-actions');
-  for (const [action, gesture] of Object.entries(gestures)) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.action = action;
-    button.textContent = gesture.label;
-    gestureActions.append(button);
-  }
   for (const button of document.querySelectorAll('[data-action]')) {
     button.addEventListener('click', async () => {
       const {action} = button.dataset;
@@ -116,7 +108,7 @@
         const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
         const accepted = await chrome.tabs.sendMessage(tab.id, {type: 'luna-action', action});
         if (!accepted) throw new Error('No active pet');
-        status.textContent = responses[action] ?? 'Питомец выполняет команду.';
+        status.textContent = responses[action];
       } catch {
         status.textContent = 'Откройте обычную веб-страницу или обновите вкладку.';
       }
@@ -125,7 +117,7 @@
 
   function animate(now) {
     const elapsed = now - started;
-    if (elapsed > (gestures[preview]?.duration ?? (preview === 'sleep' ? 4200 : 2000))) preview = 'idle';
+    if (elapsed > (preview === 'sleep' ? 4200 : 2000)) preview = 'idle';
     const frame = frameAt(preview, reduced.matches ? 0 : elapsed);
     if (last !== preview + frame) {
       paint(portrait, preview, frame);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Луна — пиксельный питомец",
   "description": "Пиксельные питомцы для открытых страниц. Выберите Луну или загрузите своего персонажа.",
-  "version": "2.6.1",
+  "version": "2.4.0",
   "permissions": [
     "storage"
   ],
@@ -14,9 +14,6 @@
     "32": "icons/32.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
-  },
-  "background": {
-    "service_worker": "background.js"
   },
   "action": {
     "default_title": "Луна",
@@ -36,7 +33,6 @@
         "atlas.js",
         "pet.js",
         "platforms.js",
-        "amo-pets.js",
         "content.js"
       ],
       "run_at": "document_idle"
