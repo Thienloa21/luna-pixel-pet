@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="popup.css">
   <script src="atlas.js" defer></script>
   <script src="pet.js" defer></script>
-  <script src="import.js" defer></script>
   <script src="popup.js" defer></script>
 </head>
 <body>
@@ -28,21 +27,7 @@
       <span>Персонаж</span>
       <select id="character" disabled></select>
     </label>
-    <details class="library">
-      <summary>Добавить своего персонажа</summary>
-      <p>Используйте шаблон Луны как референс для ИИ. Нужен прозрачный PNG 1536 × 576 с 20 кадрами в том же порядке.</p>
-      <div class="downloads">
-        <a href="assets/luna-sprites.png" download="luna-sprites.png">Скачать шаблон Луны</a>
-        <a href="assets/sprite-guide.txt" download="sprite-guide.txt">Промпт для ИИ</a>
-      </div>
-      <form id="import-character">
-        <label for="character-name">Имя</label>
-        <input id="character-name" type="text" maxlength="40" placeholder="Имя персонажа" required>
-        <label for="character-file">Спрайт-лист PNG</label>
-        <input id="character-file" type="file" accept="image/png,.png" required>
-        <button id="import-button" type="submit" disabled>Добавить персонажа</button>
-      </form>
-    </details>
+    <a class="import-link" href="characters.html" target="_blank" rel="noopener">Добавить своего персонажа</a>
     <button id="remove-character" type="button" hidden>Удалить импортированного персонажа</button>
     <fieldset id="controls" disabled>
       <legend class="sr-only">Настройки питомца</legend>

@@ -8,10 +8,6 @@
   const status = document.getElementById('status');
   const character = document.getElementById('character');
   const title = document.querySelector('h1');
-  const form = document.getElementById('import-character');
-  const nameInput = document.getElementById('character-name');
-  const fileInput = document.getElementById('character-file');
-  const importButton = document.getElementById('import-button');
   const removeButton = document.getElementById('remove-character');
   const portrait = document.getElementById('portrait').getContext('2d');
   fitCanvas(portrait.canvas, portrait.canvas.clientWidth);
@@ -50,14 +46,14 @@
   }
 
   async function updateLibrary(task, errorMessage) {
-    character.disabled = importButton.disabled = removeButton.disabled = true;
+    character.disabled = removeButton.disabled = true;
     try {
       await task();
     } catch (error) {
       status.textContent = errorMessage ?? error.message;
     } finally {
       renderCharacters();
-      character.disabled = importButton.disabled = removeButton.disabled = false;
+      character.disabled = removeButton.disabled = false;
     }
   }
 
@@ -74,34 +70,6 @@
       }
       status.textContent = 'Выбран персонаж «' + title.textContent + '».';
     }, 'Не удалось переключить персонажа.');
-  });
-
-  form.addEventListener('submit', event => {
-    event.preventDefault();
-    if (importButton.disabled) return;
-    const name = nameInput.value.trim();
-    const file = fileInput.files[0];
-    if (!name || !file) {
-      status.textContent = 'Укажите имя и выберите PNG.';
-      return;
-    }
-    updateLibrary(async () => {
-      status.textContent = 'Проверяю спрайт-лист…';
-      const png = await LunaImport.readAtlas(file);
-      const id = crypto.randomUUID();
-      const {customCharacters = []} = await chrome.storage.local.get('customCharacters');
-      const list = [...customCharacters, {id, name}];
-      try {
-        await chrome.storage.local.set({customCharacters: list, activeCharacter: id, [atlasKey(id)]: png});
-      } catch {
-        throw new Error('Не удалось сохранить персонажа. Попробуйте удалить ненужный импорт или уменьшить размер PNG.');
-      }
-      custom = list;
-      await display(id);
-      form.reset();
-      form.closest('details').open = false;
-      status.textContent = 'Персонаж «' + name + '» добавлен и выбран.';
-    });
   });
 
   removeButton.addEventListener('click', () => {
@@ -164,7 +132,7 @@
     await display('luna');
   }
   render();
-  character.disabled = importButton.disabled = false;
+  character.disabled = false;
   enabled.disabled = false;
   requestAnimationFrame(animate);
 })();

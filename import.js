@@ -48,5 +48,42 @@
     });
   }
 
-  globalThis.LunaImport = {readAtlas};
+  const form = document.getElementById('import-character');
+  const nameInput = document.getElementById('character-name');
+  const fileInput = document.getElementById('character-file');
+  const button = document.getElementById('import-button');
+  const status = document.getElementById('import-status');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (button.disabled) return;
+    const name = nameInput.value.trim();
+    const file = fileInput.files[0];
+    if (!name || !file) {
+      status.textContent = 'Укажите имя и выберите PNG.';
+      return;
+    }
+    nameInput.disabled = fileInput.disabled = button.disabled = true;
+    status.textContent = 'Проверяю спрайт-лист…';
+    try {
+      const png = await readAtlas(file);
+      const id = crypto.randomUUID();
+      try {
+        const {customCharacters = []} = await chrome.storage.local.get('customCharacters');
+        await chrome.storage.local.set({
+          customCharacters: [...customCharacters, {id, name}],
+          activeCharacter: id,
+          [Luna.atlasKey(id)]: png
+        });
+      } catch {
+        throw new Error('Не удалось сохранить персонажа. Попробуйте удалить ненужный импорт или уменьшить размер PNG.');
+      }
+      form.reset();
+      status.textContent = 'Персонаж «' + name + '» добавлен и выбран. Эту вкладку можно закрыть.';
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      nameInput.disabled = fileInput.disabled = button.disabled = false;
+    }
+  });
+  button.disabled = false;
 })();

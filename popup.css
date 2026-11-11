@@ -66,15 +66,22 @@ fieldset:disabled { opacity: 0.45; }
 p { min-height: 2.8em; color: #cabbd8; font-size: 12px; margin: 9px 0 0; }
 .sr-only { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
 
-.library {
+.import-link {
+  display: block;
   margin-top: 9px;
   border: 1px solid #493859;
   border-radius: 8px;
   padding: 7px 9px;
+  color: #f1dcff;
+  text-align: center;
+  text-decoration: none;
 }
-.library summary { cursor: pointer; color: #f1dcff; }
-.library p { min-height: 0; }
-.downloads { display: grid; gap: 4px; margin: 8px 0 10px; }
+.import-link:hover { background: #352841; }
+.import-link:focus-visible { outline: 2px solid #e4c5ff; outline-offset: 2px; }
+.character-page { width: auto; }
+.character-page main { max-width: 440px; margin: 32px auto; }
+.character-page p { min-height: 0; }
+.downloads { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 18px; }
 .downloads a { color: #e5bbff; text-underline-offset: 2px; }
 #import-character { display: grid; gap: 6px; }
 #import-character input { min-width: 0; font: inherit; }
