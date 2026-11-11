@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Обновления — Луна</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="updates.js" defer></script>
+</head>
+<body class="character-page">
+  <main>
+    <h1>Обновления</h1>
+    <p>Установлена версия <strong id="installed-version"></strong></p>
+    <div class="downloads">
+      <button id="check-update" type="button">Проверить обновления</button>
+    </div>
+    <p id="update-status" role="status"></p>
+    <section id="update-available" hidden>
+      <div class="downloads">
+        <a id="download-update" target="_blank" rel="noopener">Скачать архив с GitHub</a>
+      </div>
+      <ol>
+        <li>Распакуйте архив.</li>
+        <li>Замените файлы в папке установленной «Луны» содержимым распакованной папки. Файл manifest.json должен остаться в корне установленной папки.</li>
+        <li>Нажмите кнопку ниже и обновите открытые страницы, на которых хотите увидеть питомца.</li>
+      </ol>
+      <button id="reload-extension" type="button">Перезагрузить расширение</button>
+    </section>
+  </main>
+</body>
+</html>
