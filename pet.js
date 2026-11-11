@@ -46,6 +46,7 @@
     switch (pose) {
       case 'walk': return Math.floor(elapsed / 105) % 8;
       case 'wave': return [8, 10, 11, 10, 11, 10, 8][Math.min(6, Math.floor(elapsed / 135))];
+      case 'cast': return elapsed < 135 ? 10 : 11;
       case 'idle': return elapsed % 3300 >= 3140 ? 9 : 8;
       case 'sit': return elapsed % 3000 >= 2840 ? 17 : 16;
       case 'sleep': return 18 + (Math.floor(elapsed / 720) % 2);
