@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Луна</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="atlas.js" defer></script>
+  <script src="pet.js" defer></script>
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Луна</h1>
+      <label class="switch" title="Показывать питомца">
+        <input id="enabled" type="checkbox" aria-label="Показывать питомца" disabled>
+        <span aria-hidden="true"></span>
+      </label>
+    </header>
+    <div class="stage" aria-hidden="true">
+      <div class="moon"></div>
+      <canvas id="portrait" width="96" height="96"></canvas>
+      <div class="pedestal"></div>
+    </div>
+    <fieldset id="controls" disabled>
+      <legend class="sr-only">Настройки питомца</legend>
+      <div class="actions">
+        <button type="button" data-action="jump">Прыгни</button>
+        <button type="button" data-action="sit">Сядь</button>
+        <button type="button" data-action="sleep">Спи</button>
+      </div>
+      <label class="setting" for="size">
+        <span>Размер</span>
+        <select id="size">
+          <option value="1">Маленький · 96 px</option>
+          <option value="2">Средний · 144 px</option>
+          <option value="3">Большой · 192 px</option>
+        </select>
+      </label>
+      <label class="setting switch" for="roam">
+        <span>Гуляет сама</span>
+        <input id="roam" type="checkbox">
+        <span aria-hidden="true"></span>
+      </label>
+    </fieldset>
+    <p id="status" role="status">Нажмите на Луну или перетащите её по странице.</p>
+  </main>
+</body>
+</html>

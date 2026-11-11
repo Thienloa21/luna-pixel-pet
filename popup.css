@@ -1,0 +1,67 @@
+:root {
+  color-scheme: dark;
+  font: 13px/1.4 "Inter", system-ui, sans-serif;
+  background: #161320;
+  color: #f6eefb;
+}
+body { width: 310px; margin: 0; }
+main { padding: 15px 16px 12px; }
+header, .setting { display: flex; align-items: center; justify-content: space-between; }
+h1 { font: 600 25px/1.15 "Instrument Serif", Georgia, serif; margin: 0 0 10px; }
+header .switch { margin-bottom: 9px; }
+.stage {
+  height: 124px;
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid #43324f;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 15% 31%, #c5a6ed 0 1px, transparent 1.5px),
+    radial-gradient(circle at 79% 33%, #cfaddb 0 1px, transparent 1.5px),
+    radial-gradient(circle at 86% 54%, #aa82c8 0 1px, transparent 1.5px),
+    radial-gradient(circle at 25% 65%, #9f7eb5 0 1px, transparent 1.5px),
+    linear-gradient(145deg, #241b34, #392647 65%, #272036);
+}
+.stage canvas {
+  width: 96px; height: 96px; margin-bottom: 10px;
+  z-index: 1;
+}
+.moon {
+  position: absolute; top: 13px; right: 57px; width: 33px; height: 33px;
+  border-radius: 50%; box-shadow: inset 6px -5px #d3b5ed;
+  transform: rotate(-14deg);
+}
+.pedestal { position: absolute; bottom: 9px; width: 100px; height: 13px; border-radius: 50%; background: #181225a8; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 5px; }
+button, select {
+  font: inherit; color: inherit; background: #2c223b;
+  border: 1px solid #493859; border-radius: 7px; padding: 6px 9px;
+}
+button { cursor: pointer; }
+button:hover:enabled, select:hover:enabled { background: #433054; }
+.setting { min-height: 36px; border-bottom: 1px solid #30273c; }
+.setting select { padding: 3px 5px; }
+.switch { position: relative; cursor: pointer; }
+.switch input {
+  position: absolute; right: 0; margin: 0; width: 34px; height: 20px;
+  opacity: 0; cursor: inherit;
+}
+.switch input + span {
+  width: 34px; height: 20px; border-radius: 20px; box-sizing: border-box;
+  background: #514459; border: 1px solid #74647e; pointer-events: none;
+}
+.switch input + span::after {
+  display: block; content: ''; width: 12px; height: 12px; margin: 3px;
+  border-radius: 50%; background: #e9ddf1;
+}
+.switch input:checked + span { background: #b08ad9; border-color: #b08ad9; }
+.switch input:checked + span::after { transform: translateX(14px); background: #281e36; }
+.switch input:focus-visible + span, button:focus-visible, select:focus-visible { outline: 2px solid #e4c5ff; outline-offset: 2px; }
+fieldset:disabled { opacity: 0.45; }
+p { min-height: 2.8em; color: #cabbd8; font-size: 12px; margin: 9px 0 0; }
+.sr-only { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
