@@ -1,15 +1,25 @@
 (async () => {
-  const {defaults, reduced, paint, frameAt, fitCanvas, ready} = Luna;
+  const {defaults, reduced, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter} = Luna;
   await ready;
   const enabled = document.getElementById('enabled');
   const roam = document.getElementById('roam');
   const size = document.getElementById('size');
   const controls = document.getElementById('controls');
   const status = document.getElementById('status');
+  const character = document.getElementById('character');
+  const title = document.querySelector('h1');
+  const form = document.getElementById('import-character');
+  const nameInput = document.getElementById('character-name');
+  const fileInput = document.getElementById('character-file');
+  const importButton = document.getElementById('import-button');
+  const removeButton = document.getElementById('remove-character');
   const portrait = document.getElementById('portrait').getContext('2d');
   fitCanvas(portrait.canvas, portrait.canvas.clientWidth);
-  const hint = 'Нажмите на Луну или перетащите её по странице.';
-  let settings = (await chrome.storage.local.get('luna')).luna ?? {};
+  const hint = 'Нажмите на питомца или перетащите его по странице.';
+  const stored = await chrome.storage.local.get(['luna', 'customCharacters', 'activeCharacter']);
+  let settings = stored.luna ?? {};
+  let custom = stored.customCharacters ?? [];
+  let active = 'luna';
   let preview = 'idle';
   let started = performance.now();
   let last = '';
@@ -20,8 +30,92 @@
     roam.checked = settings.roam ?? !reduced.matches;
     size.value = settings.size ?? defaults.size;
     controls.disabled = !enabled.checked;
-    status.textContent = enabled.checked ? hint : 'Луна скрыта во всех вкладках.';
+    status.textContent = enabled.checked ? hint : 'Питомец скрыт во всех вкладках.';
   }
+
+  function renderCharacters() {
+    const library = [...characters, ...custom];
+    character.replaceChildren(...library.map(item => new Option(item.name, item.id)));
+    character.value = active;
+    title.textContent = library.find(item => item.id === active)?.name ?? 'Луна';
+    removeButton.hidden = !custom.some(item => item.id === active);
+  }
+
+  async function display(id) {
+    active = await selectCharacter(id);
+    preview = 'idle';
+    started = performance.now();
+    last = '';
+    renderCharacters();
+  }
+
+  async function updateLibrary(task, errorMessage) {
+    character.disabled = importButton.disabled = removeButton.disabled = true;
+    try {
+      await task();
+    } catch (error) {
+      status.textContent = errorMessage ?? error.message;
+    } finally {
+      renderCharacters();
+      character.disabled = importButton.disabled = removeButton.disabled = false;
+    }
+  }
+
+  character.addEventListener('change', () => {
+    const id = character.value;
+    const previous = active;
+    updateLibrary(async () => {
+      await display(id);
+      try {
+        await chrome.storage.local.set({activeCharacter: id});
+      } catch (error) {
+        await display(previous);
+        throw error;
+      }
+      status.textContent = 'Выбран персонаж «' + title.textContent + '».';
+    }, 'Не удалось переключить персонажа.');
+  });
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (importButton.disabled) return;
+    const name = nameInput.value.trim();
+    const file = fileInput.files[0];
+    if (!name || !file) {
+      status.textContent = 'Укажите имя и выберите PNG.';
+      return;
+    }
+    updateLibrary(async () => {
+      status.textContent = 'Проверяю спрайт-лист…';
+      const png = await LunaImport.readAtlas(file);
+      const id = crypto.randomUUID();
+      const {customCharacters = []} = await chrome.storage.local.get('customCharacters');
+      const list = [...customCharacters, {id, name}];
+      try {
+        await chrome.storage.local.set({customCharacters: list, activeCharacter: id, [atlasKey(id)]: png});
+      } catch {
+        throw new Error('Не удалось сохранить персонажа. Попробуйте удалить ненужный импорт или уменьшить размер PNG.');
+      }
+      custom = list;
+      await display(id);
+      form.reset();
+      form.closest('details').open = false;
+      status.textContent = 'Персонаж «' + name + '» добавлен и выбран.';
+    });
+  });
+
+  removeButton.addEventListener('click', () => {
+    const id = active;
+    updateLibrary(async () => {
+      const {customCharacters = []} = await chrome.storage.local.get('customCharacters');
+      const list = customCharacters.filter(item => item.id !== id);
+      await chrome.storage.local.set({customCharacters: list, activeCharacter: 'luna'});
+      custom = list;
+      await display('luna');
+      await chrome.storage.local.remove(atlasKey(id));
+      status.textContent = 'Импортированный персонаж удалён.';
+    }, 'Не удалось удалить персонажа.');
+  });
 
   function save(change) {
     settings = {...settings, ...change};
@@ -35,7 +129,7 @@
   roam.addEventListener('change', () => save({roam: roam.checked}));
   size.addEventListener('change', () => save({size: Number(size.value)}));
 
-  const responses = {jump: 'Луна прыгает!', sit: 'Луна присела.', sleep: 'Луна засыпает.'};
+  const responses = {jump: 'Питомец прыгает!', sit: 'Питомец присел.', sleep: 'Питомец засыпает.'};
   for (const button of document.querySelectorAll('[data-action]')) {
     button.addEventListener('click', async () => {
       const {action} = button.dataset;
@@ -64,7 +158,13 @@
     requestAnimationFrame(animate);
   }
   reduced.addEventListener('change', render);
+  try {
+    await display(stored.activeCharacter ?? 'luna');
+  } catch {
+    await display('luna');
+  }
   render();
+  character.disabled = importButton.disabled = false;
   enabled.disabled = false;
   requestAnimationFrame(animate);
 })();

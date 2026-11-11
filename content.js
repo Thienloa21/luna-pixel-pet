@@ -1,5 +1,5 @@
 (() => {
-  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready} = Luna;
+  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
   const {gravity, surface, visibleAt, trajectory, plan, crossing, firstCrossing} = LunaPlatforms;
   const host = document.createElement('luna-pet');
   for (const [property, value] of Object.entries({
@@ -40,7 +40,7 @@
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'pet';
-  button.setAttribute('aria-label', 'Питомец Луна. Нажмите, чтобы поздороваться');
+  button.setAttribute('aria-label', 'Питомец. Нажмите, чтобы поздороваться');
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   button.append(canvas);
@@ -423,14 +423,28 @@
 
   (async () => {
     await ready;
-    const stored = await chrome.storage.local.get('luna');
+    let requested;
+    async function showCharacter(id = 'luna') {
+      requested = id;
+      try {
+        await selectCharacter(id);
+      } catch {
+        if (requested === id) await selectCharacter('luna');
+      }
+      if (requested === id) paintedFrame = undefined;
+    }
+    const stored = await chrome.storage.local.get(['luna', 'activeCharacter']);
     let overrides = stored.luna;
     update(overrides);
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes.luna) return;
-      overrides = changes.luna.newValue;
-      update({...defaults, roam: !reduced.matches, ...overrides});
+      if (area !== 'local') return;
+      if (changes.activeCharacter) showCharacter(changes.activeCharacter.newValue);
+      if (changes.luna) {
+        overrides = changes.luna.newValue;
+        update({...defaults, roam: !reduced.matches, ...overrides});
+      }
     });
+    showCharacter(stored.activeCharacter);
     reduced.addEventListener('change', () => {
       if (overrides?.roam === undefined) update({roam: !reduced.matches});
     });

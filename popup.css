@@ -65,3 +65,25 @@ button:hover:enabled, select:hover:enabled { background: #433054; }
 fieldset:disabled { opacity: 0.45; }
 p { min-height: 2.8em; color: #cabbd8; font-size: 12px; margin: 9px 0 0; }
 .sr-only { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+
+.library {
+  margin-top: 9px;
+  border: 1px solid #493859;
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+.library summary { cursor: pointer; color: #f1dcff; }
+.library p { min-height: 0; }
+.downloads { display: grid; gap: 4px; margin: 8px 0 10px; }
+.downloads a { color: #e5bbff; text-underline-offset: 2px; }
+#import-character { display: grid; gap: 6px; }
+#import-character input { min-width: 0; font: inherit; }
+#import-character input[type="text"] {
+  box-sizing: border-box; width: 100%; padding: 6px 8px;
+  border: 1px solid #493859; border-radius: 6px; background: #241a30; color: inherit;
+}
+#import-character button, #remove-character { margin-top: 5px; }
+#remove-character { width: 100%; }
+#character { max-width: 67%; }
+h1 { min-width: 0; overflow-wrap: anywhere; }
+header .switch { flex-shrink: 0; }

@@ -1,14 +1,46 @@
 (() => {
   const size = 48;
   const cell = 192;
+  const layout = {cell, columns: 8, rows: 3, frames: 20};
+  const characters = [{id: 'luna', name: 'Луна'}];
+  const atlasKey = id => 'character:' + id;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const defaults = {enabled: true, size: 2, roam: !reduced.matches};
-  const binary = atob(lunaAtlas);
-  const pixels = new Uint8Array(binary.length);
-  for (let i = 0; i < pixels.length; i++) pixels[i] = binary.charCodeAt(i);
+  function decode(encoded) {
+    const binary = atob(encoded);
+    const pixels = new Uint8Array(binary.length);
+    for (let i = 0; i < pixels.length; i++) pixels[i] = binary.charCodeAt(i);
+    return createImageBitmap(new Blob([pixels], {type: 'image/png'}));
+  }
+  const moon = decode(lunaAtlas);
   delete globalThis.lunaAtlas;
   let atlas;
-  const ready = createImageBitmap(new Blob([pixels], {type: 'image/png'})).then(bitmap => { atlas = bitmap; });
+  let active = 'luna';
+  let revision = 0;
+  const ready = moon.then(bitmap => { atlas = bitmap; });
+
+  async function selectCharacter(id = 'luna') {
+    const request = ++revision;
+    await ready;
+    if (id === active) return active;
+    let next;
+    if (id === 'luna') {
+      next = await moon;
+    } else {
+      const key = atlasKey(id);
+      const encoded = (await chrome.storage.local.get(key))[key];
+      if (!encoded) throw new Error('Спрайты персонажа недоступны.');
+      next = await decode(encoded);
+    }
+    if (request !== revision) {
+      if (id !== 'luna') next.close();
+      return active;
+    }
+    if (active !== 'luna') atlas.close();
+    atlas = next;
+    active = id;
+    return active;
+  }
 
   function frameAt(pose, elapsed) {
     switch (pose) {
@@ -42,9 +74,9 @@
       ctx.translate(side, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(atlas, frame % 8 * cell, Math.floor(frame / 8) * cell, cell, cell, 0, 0, side, side);
+    ctx.drawImage(atlas, frame % layout.columns * cell, Math.floor(frame / layout.columns) * cell, cell, cell, 0, 0, side, side);
     ctx.restore();
   }
 
-  globalThis.Luna = {size, defaults, reduced, ready, frameAt, fitCanvas, paint};
+  globalThis.Luna = {size, layout, characters, atlasKey, defaults, reduced, ready, selectCharacter, frameAt, fitCanvas, paint};
 })();
