@@ -1,5 +1,6 @@
 (() => {
-  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
+  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter,
+    reactions = {}, reactionFor = () => undefined, ledgeDrop = 0} = Luna;
   const {gravity, surface, visibleAt, trajectory, plan, crossing, firstCrossing} = LunaPlatforms;
   const host = document.createElement('luna-pet');
   for (const [property, value] of Object.entries({
@@ -147,7 +148,7 @@
     if (motion && (!element || (edge && visibleAt(element, destination, edge.y + 3, host)))) {
       beginFlight(motion, edge);
     } else {
-      play('sit', sittingTime());
+      finishLanding();
     }
   }
 
@@ -179,14 +180,36 @@
     play('land', 125);
   }
 
+  function finishLanding() {
+    const {next = 'sit', duration = sittingTime()} = afterLanding ?? {};
+    afterLanding = undefined;
+    play(next, duration);
+  }
+
   function rest(next, duration) {
-    if (pose === 'jump') afterLanding = {next, duration};
-    else if (pose !== 'held') play(next, duration);
+    if (pose === 'held') return false;
+    if (pose === 'jump' || pose === 'crouch' || pose === 'land') afterLanding = {next, duration};
+    else play(next, duration);
+    return true;
+  }
+
+  function react(next) {
+    const reaction = reactionFor(next);
+    return Boolean(reaction && rest(next, reaction.duration));
+  }
+
+  function greet() {
+    if (!react('joy')) rest('wave', 1050);
   }
 
   function choose() {
     if (!settings.roam) return play('idle');
     const roll = Math.random();
+    if (roll >= 0.68 && roll < 0.91 && reactionFor('joy')) {
+      const candidates = supportEdge && Math.random() < 0.35 ? ['ledge'] :
+        Object.keys(reactions).filter(id => id !== 'joy' && (id !== 'ledge' || supportEdge));
+      if (react(candidates[Math.floor(Math.random() * candidates.length)])) return;
+    }
     if (roll < 0.68 && platformJump()) return;
     if (supportEdge && roll < 0.35) {
       const exits = [supportEdge.min - 30 * scale, supportEdge.max + 30 * scale];
@@ -218,16 +241,18 @@
     const projectedEdge = pose === 'jump' && landingEdge && x >= landingEdge.min && x <= landingEdge.max && y <= landingEdge.y
       ? landingEdge : undefined;
     const ground = (supportEdge ?? projectedEdge)?.y ?? floor();
-    const nextPosition = [Math.round(x), Math.round(y), scale, ground].join('/');
+    const perched = pose === 'ledge' && Boolean(supportEdge) && Boolean(reactionFor(pose));
+    const offset = perched ? ledgeDrop * size * scale : 0;
+    const nextPosition = [Math.round(x), Math.round(y), scale, ground, perched].join('/');
     if (nextPosition !== position) {
       position = nextPosition;
-      button.style.transform = `translate(${Math.round(x - size * scale / 2)}px, ${Math.round(y - 46 * scale)}px)`;
+      button.style.transform = `translate(${Math.round(x - size * scale / 2)}px, ${Math.round(y - 46 * scale + offset)}px)`;
       const elevation = Math.max(0, ground - y);
       const shade = 1 - Math.min(elevation / 200, 0.65);
       const w = 23 * scale * shade;
       shadow.style.width = w + 'px';
       shadow.style.height = 5 * scale + 'px';
-      shadow.style.opacity = String(shade * 0.24);
+      shadow.style.opacity = String(perched ? 0 : shade * 0.24);
       shadow.style.transform = `translate(${Math.round(x - w / 2)}px, ${Math.round(ground - 2)}px)`;
     }
     const sleeping = pose === 'sleep';
@@ -293,11 +318,8 @@
       stepFlight(seconds);
     } else if (elapsed >= end) {
       if (pose === 'crouch') launch();
-      else if (pose === 'land') {
-        const {next = 'sit', duration = sittingTime()} = afterLanding ?? {};
-        afterLanding = undefined;
-        play(next, duration);
-      } else choose();
+      else if (pose === 'land') finishLanding();
+      else choose();
     }
 
     if (scale > 0) draw();
@@ -365,7 +387,7 @@
     if (dragged) {
       drop(motion);
     } else if (event.type === 'pointerup') {
-      rest('wave', 1050);
+      greet();
     }
   }
 
@@ -373,7 +395,7 @@
     button.addEventListener(name, release);
   }
   button.addEventListener('click', event => {
-    if (event.detail === 0) rest('wave', 1050);
+    if (event.detail === 0) greet();
   });
 
   function invalidateSupport() {
@@ -417,7 +439,7 @@
     if (message.action === 'jump') jump();
     else if (message.action === 'sit') rest('sit', 12000);
     else if (message.action === 'sleep') rest('sleep', 22000);
-    else return;
+    else if (!react(message.action)) return;
     respond(true);
   });
 
@@ -431,7 +453,11 @@
       } catch {
         if (requested === id) await selectCharacter('luna');
       }
-      if (requested === id) paintedFrame = undefined;
+      if (requested === id) {
+        paintedFrame = undefined;
+        if (Object.prototype.hasOwnProperty.call(reactions, pose) && !reactionFor(pose)) play('idle', settings.roam ? 600 : Infinity);
+        if (afterLanding && Object.prototype.hasOwnProperty.call(reactions, afterLanding.next) && !reactionFor(afterLanding.next)) afterLanding = undefined;
+      }
     }
     const stored = await chrome.storage.local.get(['luna', 'activeCharacter']);
     let overrides = stored.luna;

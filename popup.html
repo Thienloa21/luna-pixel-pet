@@ -6,6 +6,8 @@
   <title>Луна</title>
   <link rel="stylesheet" href="popup.css">
   <script src="atlas.js" defer></script>
+  <script src="reaction-atlas.js" defer></script>
+  <script src="reactions.js" defer></script>
   <script src="pet.js" defer></script>
   <script src="popup.js" defer></script>
 </head>
@@ -35,6 +37,11 @@
         <button type="button" data-action="jump">Прыгни</button>
         <button type="button" data-action="sit">Сядь</button>
         <button type="button" data-action="sleep">Спи</button>
+      </div>
+      <div id="reaction-controls" class="setting reaction-controls" hidden>
+        <label class="sr-only" for="reaction">Реакция Луны</label>
+        <select id="reaction"></select>
+        <button type="button" id="play-reaction">Показать</button>
       </div>
       <label class="setting" for="size">
         <span>Размер</span>

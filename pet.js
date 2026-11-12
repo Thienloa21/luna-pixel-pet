@@ -6,18 +6,31 @@
   const atlasKey = id => 'character:' + id;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const defaults = {enabled: true, size: 2, roam: !reduced.matches};
-  function decode(encoded) {
+  function decode(encoded, type = 'image/png') {
     const binary = atob(encoded);
     const pixels = new Uint8Array(binary.length);
     for (let i = 0; i < pixels.length; i++) pixels[i] = binary.charCodeAt(i);
-    return createImageBitmap(new Blob([pixels], {type: 'image/png'}));
+    return createImageBitmap(new Blob([pixels], {type}));
   }
   const moon = decode(lunaAtlas);
   delete globalThis.lunaAtlas;
+  const extras = globalThis.LunaReactions;
+  const reactionData = globalThis.lunaReactionAtlas;
+  delete globalThis.LunaReactions;
+  delete globalThis.lunaReactionAtlas;
+  const reactions = extras?.reactions ?? {};
+  let reactionAtlas;
+  const reactionsReady = reactionData
+    ? decode(reactionData, 'image/webp').then(bitmap => { reactionAtlas = bitmap; }).catch(() => {})
+    : Promise.resolve();
   let atlas;
   let active = 'luna';
   let revision = 0;
   const ready = moon.then(bitmap => { atlas = bitmap; });
+
+  function reactionFor(pose) {
+    return active === 'luna' && reactionAtlas && Object.prototype.hasOwnProperty.call(reactions, pose) ? reactions[pose] : undefined;
+  }
 
   async function selectCharacter(id = 'luna') {
     const request = ++revision;
@@ -43,6 +56,12 @@
   }
 
   function frameAt(pose, elapsed) {
+    const reaction = reactionFor(pose);
+    if (reaction) {
+      if (reduced.matches) return reaction.still;
+      const time = Math.min(elapsed, reaction.duration - 1) % reaction.cycle;
+      return reaction.frames.find(({until}) => time < until).frame;
+    }
     switch (pose) {
       case 'walk': return Math.floor(elapsed / 105) % 8;
       case 'wave': return [8, 10, 11, 10, 11, 10, 8][Math.min(6, Math.floor(elapsed / 135))];
@@ -74,9 +93,14 @@
       ctx.translate(side, 0);
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(atlas, frame % layout.columns * cell, Math.floor(frame / layout.columns) * cell, cell, cell, 0, 0, side, side);
+    const reaction = reactionFor(pose);
+    const pixels = reaction ? extras.cell : cell;
+    const columns = reaction ? extras.columns : layout.columns;
+    ctx.drawImage(reaction ? reactionAtlas : atlas, frame % columns * pixels, Math.floor(frame / columns) * pixels,
+      pixels, pixels, 0, 0, side, side);
     ctx.restore();
   }
 
-  globalThis.Luna = {size, layout, characters, atlasKey, defaults, reduced, ready, selectCharacter, frameAt, fitCanvas, paint};
+  globalThis.Luna = {size, layout, characters, atlasKey, defaults, reduced, ready, selectCharacter, frameAt, fitCanvas, paint,
+    reactions, reactionsReady, reactionFor, ledgeDrop: extras?.ledgeDrop ?? 0};
 })();
