@@ -76,6 +76,51 @@
     }
   }
 
+  const seated = new Set(['sit', 'sleep', 'curious', 'ledge', 'tea', 'read', 'play',
+    'snack', 'rain', 'snow', 'sun', 'box', 'blanket', 'cat']);
+  const bent = new Set(['crouch', 'land']);
+  const airborne = new Set(['jump', 'held', 'land']);
+  const emptyTransition = {keys: [], duration: 0};
+
+  // Reuse solid, grounded keyframes. The sprite never fades or doubles, and
+  // jumping, falling and landing always use the pose dictated by the physics.
+  function transitionBetween(from, to) {
+    if (reduced.matches || from === to || airborne.has(to) || from === 'jump' || from === 'held') return emptyTransition;
+    const fromSeat = seated.has(from);
+    const toSeat = seated.has(to);
+    const keys = [];
+    let duration = 0;
+    function add(pose, ms, holdFrom = false) {
+      if ((pose === from && !holdFrom) || pose === to || keys.at(-1)?.pose === pose) return;
+      keys.push({pose, until: duration += ms});
+    }
+    const neutralSeat = reactionFor(from) && reactionFor(to) ? 'curious' : 'sit';
+    if (fromSeat && toSeat && (from === 'ledge' || to === 'ledge')) {
+      // Move the neutral frame to the perch first so the ledge graphic
+      // itself appears already aligned with the page block.
+      add(to === 'curious' ? 'sit' : 'curious', 160, true);
+    } else if (fromSeat && toSeat) {
+      add(neutralSeat, 120);
+    } else if (toSeat) {
+      if (from === 'walk') add('idle', 65);
+      if (!bent.has(from)) add('crouch', 100);
+      add(neutralSeat, to === 'ledge' ? 160 : 100);
+    } else if (fromSeat) {
+      if (from !== 'sit') add('sit', 85);
+      add('crouch', 100);
+      if (!bent.has(to)) add('idle', 80);
+    } else if (from === 'walk' || (to !== 'crouch' && from !== 'idle')) {
+      add('idle', 80);
+    }
+    return {keys, duration};
+  }
+
+  function animationSample(transition, pose, elapsed) {
+    const key = !reduced.matches && transition?.keys.find(({until}) => elapsed < until);
+    if (key) return {pose: key.pose, elapsed: 0};
+    return {pose, elapsed: Math.max(0, elapsed - (transition?.duration ?? 0))};
+  }
+
   function fitCanvas(canvas, cssPixels) {
     const side = Math.min(cell, Math.max(1, Math.round(cssPixels * devicePixelRatio)));
     if (canvas.width === side && canvas.height === side) return false;
@@ -102,5 +147,5 @@
   }
 
   globalThis.Luna = {size, layout, characters, atlasKey, defaults, reduced, ready, selectCharacter, frameAt, fitCanvas, paint,
-    reactions, reactionsReady, reactionFor, ledgeDrop: extras?.ledgeDrop ?? 0};
+    reactions, reactionsReady, reactionFor, transitionBetween, animationSample, ledgeDrop: extras?.ledgeDrop ?? 0};
 })();

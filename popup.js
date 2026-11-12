@@ -1,6 +1,6 @@
 (async () => {
   const {defaults, reduced, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter,
-    reactions, reactionsReady, reactionFor} = Luna;
+    reactions, reactionsReady, reactionFor, transitionBetween, animationSample} = Luna;
   await Promise.all([ready, reactionsReady]);
   const enabled = document.getElementById('enabled');
   const roam = document.getElementById('roam');
@@ -22,6 +22,10 @@
   let active = 'luna';
   let preview = 'idle';
   let started = performance.now();
+  let previewEnd = Infinity;
+  let transition;
+  let afterPreviewLanding;
+  let command = 0;
   let last = '';
   let pending = Promise.resolve();
 
@@ -44,8 +48,9 @@
 
   async function display(id) {
     active = await selectCharacter(id);
-    preview = 'idle';
-    started = performance.now();
+    command++;
+    afterPreviewLanding = undefined;
+    showPose('idle', Infinity, performance.now(), true);
     last = '';
     renderCharacters();
   }
@@ -103,17 +108,37 @@
   size.addEventListener('change', () => save({size: Number(size.value)}));
 
   const responses = {jump: 'Питомец прыгает!', sit: 'Питомец присел.', sleep: 'Питомец засыпает.'};
+  function showPose(next, duration, now, immediate = false) {
+    const from = animationSample(transition, preview, now - started).pose;
+    transition = immediate ? undefined : transitionBetween(from, next);
+    preview = next;
+    started = now;
+    previewEnd = duration + (transition?.duration ?? 0);
+  }
+
   async function perform(action) {
-    preview = action;
-    started = performance.now();
+    const request = ++command;
+    const reaction = reactionFor(action);
+    const now = performance.now();
+    const duration = reaction?.duration ?? (action === 'sleep' ? 4200 : 2000);
+    const inFlight = preview === 'crouch' || preview === 'jump' || preview === 'land';
+    if (action === 'jump') {
+      if (!inFlight) showPose('crouch', 105, now);
+    } else if (inFlight) {
+      afterPreviewLanding = {pose: action, duration};
+    } else {
+      showPose(action, duration, now);
+    }
     try {
       await pending;
       const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
       const accepted = await chrome.tabs.sendMessage(tab.id, {type: 'luna-action', action});
-      if (!accepted) throw new Error('No active pet');
-      status.textContent = responses[action] ?? 'Луна: ' + reactionFor(action)?.label.toLowerCase() + '.';
+      if (request !== command) return;
+      status.textContent = accepted
+        ? responses[action] ?? 'Луна: ' + reaction.label.toLowerCase() + '.'
+        : 'Питомец пока не может выполнить эту команду.';
     } catch {
-      status.textContent = 'Откройте обычную веб-страницу или обновите вкладку.';
+      if (request === command) status.textContent = 'Откройте обычную веб-страницу или обновите вкладку.';
     }
   }
   for (const button of document.querySelectorAll('[data-action]')) {
@@ -122,12 +147,24 @@
   document.getElementById('play-reaction').addEventListener('click', () => perform(reaction.value));
 
   function animate(now) {
-    const elapsed = now - started;
-    if (elapsed > (reactionFor(preview)?.duration ?? (preview === 'sleep' ? 4200 : 2000))) preview = 'idle';
-    const frame = frameAt(preview, reduced.matches ? 0 : elapsed);
-    if (last !== preview + frame) {
-      paint(portrait, preview, frame);
-      last = preview + frame;
+    if (now - started >= previewEnd) {
+      if (preview === 'crouch') showPose('jump', 410, now, true);
+      else if (preview === 'jump') showPose('land', 125, now, true);
+      else {
+        const {pose, duration} = afterPreviewLanding ?? {pose: 'idle', duration: Infinity};
+        afterPreviewLanding = undefined;
+        showPose(pose, duration, now);
+      }
+    }
+    const visual = animationSample(transition, preview, now - started);
+    const frame = frameAt(visual.pose, reduced.matches ? 0 : visual.elapsed);
+    const flight = preview === 'jump' && !reduced.matches ? Math.min(1, visual.elapsed / 410) : 0;
+    const height = Math.round(16 * 4 * flight * (1 - flight));
+    const key = [visual.pose, frame, height].join('/');
+    if (last !== key) {
+      paint(portrait, visual.pose, frame);
+      portrait.canvas.style.transform = height ? 'translateY(-' + height + 'px)' : '';
+      last = key;
     }
     requestAnimationFrame(animate);
   }
