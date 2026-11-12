@@ -1,16 +1,12 @@
 (async () => {
-  const {defaults, reduced, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter,
-    reactions, reactionsReady, reactionFor, transitionBetween, animationSample} = Luna;
-  await Promise.all([ready, reactionsReady]);
+  const {defaults, reduced, paint, frameAt, fitCanvas, ready, characters, atlasKey, selectCharacter} = Luna;
+  await ready;
   const enabled = document.getElementById('enabled');
   const roam = document.getElementById('roam');
   const size = document.getElementById('size');
   const controls = document.getElementById('controls');
   const status = document.getElementById('status');
   const character = document.getElementById('character');
-  const reactionControls = document.getElementById('reaction-controls');
-  const reaction = document.getElementById('reaction');
-  reaction.replaceChildren(...Object.entries(reactions).map(([id, {label}]) => new Option(label, id)));
   const title = document.querySelector('h1');
   const removeButton = document.getElementById('remove-character');
   const portrait = document.getElementById('portrait').getContext('2d');
@@ -22,10 +18,6 @@
   let active = 'luna';
   let preview = 'idle';
   let started = performance.now();
-  let previewEnd = Infinity;
-  let transition;
-  let afterPreviewLanding;
-  let command = 0;
   let last = '';
   let pending = Promise.resolve();
 
@@ -43,14 +35,12 @@
     character.value = active;
     title.textContent = library.find(item => item.id === active)?.name ?? 'Луна';
     removeButton.hidden = !custom.some(item => item.id === active);
-    reactionControls.hidden = !reactionFor('joy');
   }
 
   async function display(id) {
     active = await selectCharacter(id);
-    command++;
-    afterPreviewLanding = undefined;
-    showPose('idle', Infinity, performance.now(), true);
+    preview = 'idle';
+    started = performance.now();
     last = '';
     renderCharacters();
   }
@@ -108,63 +98,30 @@
   size.addEventListener('change', () => save({size: Number(size.value)}));
 
   const responses = {jump: 'Питомец прыгает!', sit: 'Питомец присел.', sleep: 'Питомец засыпает.'};
-  function showPose(next, duration, now, immediate = false) {
-    const from = animationSample(transition, preview, now - started).pose;
-    transition = immediate ? undefined : transitionBetween(from, next);
-    preview = next;
-    started = now;
-    previewEnd = duration + (transition?.duration ?? 0);
-  }
-
-  async function perform(action) {
-    const request = ++command;
-    const reaction = reactionFor(action);
-    const now = performance.now();
-    const duration = reaction?.duration ?? (action === 'sleep' ? 4200 : 2000);
-    const inFlight = preview === 'crouch' || preview === 'jump' || preview === 'land';
-    if (action === 'jump') {
-      if (!inFlight) showPose('crouch', 105, now);
-    } else if (inFlight) {
-      afterPreviewLanding = {pose: action, duration};
-    } else {
-      showPose(action, duration, now);
-    }
-    try {
-      await pending;
-      const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-      const accepted = await chrome.tabs.sendMessage(tab.id, {type: 'luna-action', action});
-      if (request !== command) return;
-      status.textContent = accepted
-        ? responses[action] ?? 'Луна: ' + reaction.label.toLowerCase() + '.'
-        : 'Питомец пока не может выполнить эту команду.';
-    } catch {
-      if (request === command) status.textContent = 'Откройте обычную веб-страницу или обновите вкладку.';
-    }
-  }
   for (const button of document.querySelectorAll('[data-action]')) {
-    button.addEventListener('click', () => perform(button.dataset.action));
+    button.addEventListener('click', async () => {
+      const {action} = button.dataset;
+      preview = action;
+      started = performance.now();
+      try {
+        await pending;
+        const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+        const accepted = await chrome.tabs.sendMessage(tab.id, {type: 'luna-action', action});
+        if (!accepted) throw new Error('No active pet');
+        status.textContent = responses[action];
+      } catch {
+        status.textContent = 'Откройте обычную веб-страницу или обновите вкладку.';
+      }
+    });
   }
-  document.getElementById('play-reaction').addEventListener('click', () => perform(reaction.value));
 
   function animate(now) {
-    if (now - started >= previewEnd) {
-      if (preview === 'crouch') showPose('jump', 410, now, true);
-      else if (preview === 'jump') showPose('land', 125, now, true);
-      else {
-        const {pose, duration} = afterPreviewLanding ?? {pose: 'idle', duration: Infinity};
-        afterPreviewLanding = undefined;
-        showPose(pose, duration, now);
-      }
-    }
-    const visual = animationSample(transition, preview, now - started);
-    const frame = frameAt(visual.pose, reduced.matches ? 0 : visual.elapsed);
-    const flight = preview === 'jump' && !reduced.matches ? Math.min(1, visual.elapsed / 410) : 0;
-    const height = Math.round(16 * 4 * flight * (1 - flight));
-    const key = [visual.pose, frame, height].join('/');
-    if (last !== key) {
-      paint(portrait, visual.pose, frame);
-      portrait.canvas.style.transform = height ? 'translateY(-' + height + 'px)' : '';
-      last = key;
+    const elapsed = now - started;
+    if (elapsed > (preview === 'sleep' ? 4200 : 2000)) preview = 'idle';
+    const frame = frameAt(preview, reduced.matches ? 0 : elapsed);
+    if (last !== preview + frame) {
+      paint(portrait, preview, frame);
+      last = preview + frame;
     }
     requestAnimationFrame(animate);
   }

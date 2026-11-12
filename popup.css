@@ -46,9 +46,6 @@ button { cursor: pointer; }
 button:hover:enabled, select:hover:enabled { background: #433054; }
 .setting { min-height: 36px; border-bottom: 1px solid #30273c; }
 .setting select { padding: 3px 5px; }
-.reaction-controls { gap: 6px; padding: 5px 0; }
-.reaction-controls[hidden] { display: none; }
-.reaction-controls select { flex: 1; min-width: 0; }
 .switch { position: relative; cursor: pointer; }
 .switch input {
   position: absolute; right: 0; margin: 0; width: 34px; height: 20px;

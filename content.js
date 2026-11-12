@@ -1,6 +1,5 @@
 (() => {
-  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter,
-    reactions = {}, reactionFor = () => undefined, transitionBetween, animationSample, ledgeDrop = 0} = Luna;
+  const {size, defaults, reduced, frameAt, fitCanvas, paint, ready, selectCharacter} = Luna;
   const {gravity, surface, visibleAt, trajectory, plan, crossing, firstCrossing} = LunaPlatforms;
   const host = document.createElement('luna-pet');
   for (const [property, value] of Object.entries({
@@ -59,8 +58,6 @@
   let pose = 'idle';
   let elapsed = 0;
   let end = 1500;
-  let transition;
-  let offsetFrom = 0, offsetTo = 0, offsetDuration = 0;
   let previousTime;
   let raf = 0;
   let vx = 0, vy = 0;
@@ -94,22 +91,10 @@
     if (scale > 0) draw();
   }
 
-  function perchOffset() {
-    if (!supportEdge || reduced.matches || elapsed >= offsetDuration) return supportEdge ? offsetTo : 0;
-    const t = elapsed / offsetDuration;
-    return offsetFrom + (offsetTo - offsetFrom) * t * t * (3 - 2 * t);
-  }
-
-  function play(next, duration = Infinity, immediate = false) {
-    const from = animationSample(transition, pose, elapsed).pose;
-    transition = immediate ? undefined : transitionBetween(from, next);
-    offsetFrom = perchOffset();
-    offsetTo = next === 'ledge' && supportEdge && reactionFor(next) ? ledgeDrop : 0;
-    offsetDuration = !immediate && !reduced.matches && offsetFrom !== offsetTo
-      ? Math.max(160, transition?.duration ?? 0) : 0;
+  function play(next, duration = Infinity) {
     pose = next;
     elapsed = 0;
-    end = duration + (transition?.duration ?? 0);
+    end = duration;
     effect.hidden = true;
   }
 
@@ -132,20 +117,18 @@
   }
 
   function jump() {
-    if (pose === 'jump' || pose === 'held' || pose === 'crouch' || pose === 'land') return false;
-    if (platformJump()) return true;
+    if (pose === 'jump' || pose === 'held' || pose === 'crouch') return;
+    if (platformJump()) return;
     const forward = boundX(x + facing * 73);
     const backward = boundX(x - facing * 73);
     const destination = Math.abs(forward - x) > 20 ? forward : backward;
     const tx = supportEdge ? clamp(destination, supportEdge.min, supportEdge.max) : destination;
     const next = trajectory(x, y, tx, y, ceiling());
-    if (!next) return false;
-    prepareJump({...next, tx, element: support?.element});
-    return true;
+    if (next) prepareJump({...next, tx, element: support?.element});
+    else play('wave', 950);
   }
 
   function beginFlight(motion, edge, thrown = false) {
-    takeoff = undefined;
     support = supportEdge = undefined;
     freeFlight = thrown;
     landing = edge?.element;
@@ -164,7 +147,7 @@
     if (motion && (!element || (edge && visibleAt(element, destination, edge.y + 3, host)))) {
       beginFlight(motion, edge);
     } else {
-      finishLanding();
+      play('sit', sittingTime());
     }
   }
 
@@ -196,36 +179,14 @@
     play('land', 125);
   }
 
-  function finishLanding() {
-    const {next = 'sit', duration = sittingTime()} = afterLanding ?? {};
-    afterLanding = undefined;
-    play(next, duration);
-  }
-
   function rest(next, duration) {
-    if (pose === 'held') return false;
-    if (pose === 'jump' || pose === 'crouch' || pose === 'land') afterLanding = {next, duration};
-    else play(next, duration);
-    return true;
-  }
-
-  function react(next) {
-    const reaction = reactionFor(next);
-    return Boolean(reaction && rest(next, reaction.duration));
-  }
-
-  function greet() {
-    if (!react('joy')) rest('wave', 1050);
+    if (pose === 'jump') afterLanding = {next, duration};
+    else if (pose !== 'held') play(next, duration);
   }
 
   function choose() {
     if (!settings.roam) return play('idle');
     const roll = Math.random();
-    if (roll >= 0.68 && roll < 0.91 && reactionFor('joy')) {
-      const candidates = supportEdge && Math.random() < 0.35 ? ['ledge'] :
-        Object.keys(reactions).filter(id => id !== 'joy' && (id !== 'ledge' || supportEdge));
-      if (react(candidates[Math.floor(Math.random() * candidates.length)])) return;
-    }
     if (roll < 0.68 && platformJump()) return;
     if (supportEdge && roll < 0.35) {
       const exits = [supportEdge.min - 30 * scale, supportEdge.max + 30 * scale];
@@ -236,8 +197,8 @@
     if (roll < 0.60) {
       const direction = x < width / 2 ? 1 : -1;
       walk(direction);
-    } else if (roll < 0.79 && jump()) {
-      return;
+    } else if (roll < 0.79) {
+      jump();
     } else if (roll < 0.89) {
       play('wave', 950);
     } else {
@@ -246,11 +207,10 @@
   }
 
   function draw() {
-    const visual = animationSample(transition, pose, elapsed);
-    const frame = frameAt(visual.pose, visual.elapsed);
-    if (visual.pose !== paintedPose || frame !== paintedFrame || facing !== paintedFacing) {
-      paint(ctx, visual.pose, frame, facing);
-      paintedPose = visual.pose;
+    const frame = frameAt(pose, elapsed);
+    if (pose !== paintedPose || frame !== paintedFrame || facing !== paintedFacing) {
+      paint(ctx, pose, frame, facing);
+      paintedPose = pose;
       paintedFrame = frame;
       paintedFacing = facing;
     }
@@ -258,28 +218,26 @@
     const projectedEdge = pose === 'jump' && landingEdge && x >= landingEdge.min && x <= landingEdge.max && y <= landingEdge.y
       ? landingEdge : undefined;
     const ground = (supportEdge ?? projectedEdge)?.y ?? floor();
-    const lift = perchOffset();
-    const offset = Math.round(lift * size * scale);
-    const nextPosition = [Math.round(x), Math.round(y), scale, ground, offset].join('/');
+    const nextPosition = [Math.round(x), Math.round(y), scale, ground].join('/');
     if (nextPosition !== position) {
       position = nextPosition;
-      button.style.transform = `translate(${Math.round(x - size * scale / 2)}px, ${Math.round(y - 46 * scale + offset)}px)`;
+      button.style.transform = `translate(${Math.round(x - size * scale / 2)}px, ${Math.round(y - 46 * scale)}px)`;
       const elevation = Math.max(0, ground - y);
       const shade = 1 - Math.min(elevation / 200, 0.65);
       const w = 23 * scale * shade;
       shadow.style.width = w + 'px';
       shadow.style.height = 5 * scale + 'px';
-      shadow.style.opacity = String(shade * 0.24 * (ledgeDrop ? 1 - lift / ledgeDrop : 1));
+      shadow.style.opacity = String(shade * 0.24);
       shadow.style.transform = `translate(${Math.round(x - w / 2)}px, ${Math.round(ground - 2)}px)`;
     }
-    const sleeping = visual.pose === 'sleep';
-    const showEffect = sleeping || (visual.pose === 'wave' && visual.elapsed < 780);
+    const sleeping = pose === 'sleep';
+    const showEffect = sleeping || (pose === 'wave' && elapsed < 780);
     if (effect.hidden === showEffect) effect.hidden = !showEffect;
     if (showEffect) {
-      const text = sleeping ? ['z', 'z z', 'z z Z'][Math.floor(visual.elapsed / 380) % 3] : '♥';
+      const text = sleeping ? ['z', 'z z', 'z z Z'][Math.floor(elapsed / 380) % 3] : '♥';
       if (effect.textContent !== text) effect.textContent = text;
       effect.toggleAttribute('data-sleep', sleeping);
-      const rise = reduced.matches ? 0 : sleeping ? 0 : Math.floor(visual.elapsed / 38);
+      const rise = reduced.matches ? 0 : sleeping ? 0 : Math.floor(elapsed / 38);
       effect.style.transform = `translate(${Math.round(clamp(x + 12 * scale, 0, width - 42))}px, ${Math.max(2, Math.round(y - 43 * scale - rise))}px)`;
     }
   }
@@ -291,10 +249,7 @@
       play('sit', sittingTime());
       return;
     }
-    const walkingElapsed = elapsed - (transition?.duration ?? 0);
-    if (walkingElapsed <= 0) return;
-    const pace = reduced.matches ? 1 : clamp(Math.min(walkingElapsed, end - elapsed) / 170, 0, 1);
-    x = clamp(x + seconds * 66 * facing * pace, min, max);
+    x = clamp(x + seconds * 66 * facing, min, max);
     if (x === min) facing = 1;
     else if (x === max) facing = -1;
     if (support) support.offset = x - supportEdge.left;
@@ -338,8 +293,11 @@
       stepFlight(seconds);
     } else if (elapsed >= end) {
       if (pose === 'crouch') launch();
-      else if (pose === 'land') finishLanding();
-      else choose();
+      else if (pose === 'land') {
+        const {next = 'sit', duration = sittingTime()} = afterLanding ?? {};
+        afterLanding = undefined;
+        play(next, duration);
+      } else choose();
     }
 
     if (scale > 0) draw();
@@ -407,7 +365,7 @@
     if (dragged) {
       drop(motion);
     } else if (event.type === 'pointerup') {
-      greet();
+      rest('wave', 1050);
     }
   }
 
@@ -415,7 +373,7 @@
     button.addEventListener(name, release);
   }
   button.addEventListener('click', event => {
-    if (event.detail === 0) greet();
+    if (event.detail === 0) rest('wave', 1050);
   });
 
   function invalidateSupport() {
@@ -426,8 +384,7 @@
     if (settings.enabled && !host.isConnected) {
       document.documentElement.append(host);
       support = supportEdge = landing = landingEdge = afterLanding = undefined;
-      takeoff = undefined;
-      play('idle', Infinity, true);
+      pose = 'idle';
       resize();
       if (settings.roam) walk(-1);
       else play('idle');
@@ -450,17 +407,18 @@
     sync();
     if (!host.isConnected) return;
     resize();
-    if (oldRoam !== settings.roam && (pose === 'idle' || (!settings.roam && pose === 'walk'))) {
+    if (oldRoam !== settings.roam && pose !== 'held' && pose !== 'jump') {
       play('idle', settings.roam ? 600 : Infinity);
     }
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (!settings.enabled || !host.isConnected || pointer?.dragged || message?.type !== 'luna-action') return;
-    if (message.action === 'jump') respond(jump());
-    else if (message.action === 'sit') respond(rest('sit', 12000));
-    else if (message.action === 'sleep') respond(rest('sleep', 22000));
-    else if (react(message.action)) respond(true);
+    if (message.action === 'jump') jump();
+    else if (message.action === 'sit') rest('sit', 12000);
+    else if (message.action === 'sleep') rest('sleep', 22000);
+    else return;
+    respond(true);
   });
 
   (async () => {
@@ -473,11 +431,7 @@
       } catch {
         if (requested === id) await selectCharacter('luna');
       }
-      if (requested === id) {
-        paintedFrame = undefined;
-        if (Object.prototype.hasOwnProperty.call(reactions, pose) && !reactionFor(pose)) play('idle', settings.roam ? 600 : Infinity, true);
-        if (afterLanding && Object.prototype.hasOwnProperty.call(reactions, afterLanding.next) && !reactionFor(afterLanding.next)) afterLanding = undefined;
-      }
+      if (requested === id) paintedFrame = undefined;
     }
     const stored = await chrome.storage.local.get(['luna', 'activeCharacter']);
     let overrides = stored.luna;
